@@ -11,8 +11,8 @@
 @layer base {
   :root {
     /* Core brand colors - Warm sunset gradient palette */
-    --background: 30 20% 99%;
-    --foreground: 20 25% 10%;
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
 
     --card: 30 25% 98%;
     --card-foreground: 20 25% 10%;
@@ -156,7 +156,8 @@
   }
 
   .card-hover {
-    @apply transition-all duration-300 hover:shadow-medium hover:-translate-y-1;
+    @apply transition-all duration-300 hover:-translate-y-1;
+    box-shadow: var(--shadow-medium);
   }
 
   .link-underline {

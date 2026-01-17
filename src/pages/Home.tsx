@@ -35,15 +35,17 @@ interface Post {
 }
 
 export default function Home() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('for-you');
 
   useEffect(() => {
-    fetchPosts();
-  }, [activeTab, user]);
+    if (!authLoading) {
+      fetchPosts();
+    }
+  }, [activeTab, user, authLoading]);
 
   const fetchPosts = async () => {
     setLoading(true);
@@ -87,6 +89,19 @@ export default function Home() {
   const handlePostCreated = () => {
     fetchPosts();
   };
+
+  // Show loading state while auth is loading
+  if (authLoading) {
+    return (
+      <MainLayout>
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="flex items-center justify-center min-h-[50vh]">
+            <Skeleton className="h-12 w-12 rounded-full" />
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
