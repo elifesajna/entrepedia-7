@@ -14,10 +14,26 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Send, MessageCircle, ArrowLeft, Circle, Plus, Search, UserPlus } from 'lucide-react';
+import { Send, MessageCircle, ArrowLeft, Circle, Plus, Search, UserPlus, MoreVertical, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -72,6 +88,8 @@ export default function Messages() {
   const [followedUsers, setFollowedUsers] = useState<FollowedUser[]>([]);
   const [followedLoading, setFollowedLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -335,6 +353,51 @@ export default function Messages() {
     );
   });
 
+  // Delete conversation
+  const handleDeleteConversation = async () => {
+    if (!conversationToDelete) return;
+
+    try {
+      // First delete all messages in the conversation
+      await supabase
+        .from('messages')
+        .delete()
+        .eq('conversation_id', conversationToDelete);
+
+      // Then delete the conversation
+      const { error } = await supabase
+        .from('conversations')
+        .delete()
+        .eq('id', conversationToDelete);
+
+      if (error) throw error;
+
+      // Update local state
+      setConversations(prev => prev.filter(c => c.id !== conversationToDelete));
+      
+      // If this was the selected conversation, clear it
+      if (selectedConversation?.id === conversationToDelete) {
+        setSelectedConversation(null);
+        setMessages([]);
+        navigate('/messages');
+      }
+
+      toast({ title: 'Chat deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
+      toast({ title: 'Error deleting chat', variant: 'destructive' });
+    } finally {
+      setDeleteDialogOpen(false);
+      setConversationToDelete(null);
+    }
+  };
+
+  const openDeleteDialog = (e: React.MouseEvent, convId: string) => {
+    e.stopPropagation();
+    setConversationToDelete(convId);
+    setDeleteDialogOpen(true);
+  };
+
   if (loading) {
     return (
       <MainLayout>
@@ -437,7 +500,7 @@ export default function Messages() {
                     <div
                       key={conv.id}
                       className={cn(
-                        "flex items-center gap-3 p-4 cursor-pointer hover:bg-muted/50 transition-colors border-b",
+                        "flex items-center gap-3 p-4 cursor-pointer hover:bg-muted/50 transition-colors border-b group",
                         selectedConversation?.id === conv.id && "bg-muted/50"
                       )}
                       onClick={() => selectConversation(conv)}
@@ -458,11 +521,33 @@ export default function Messages() {
                           <p className="font-semibold text-foreground truncate">
                             {conv.other_user?.full_name || 'Unknown'}
                           </p>
-                          {conv.unread_count && conv.unread_count > 0 && (
-                            <span className="bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full">
-                              {conv.unread_count}
-                            </span>
-                          )}
+                          <div className="flex items-center gap-1">
+                            {conv.unread_count && conv.unread_count > 0 && (
+                              <span className="bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full">
+                                {conv.unread_count}
+                              </span>
+                            )}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={(e) => openDeleteDialog(e, conv.id)}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete Chat
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </div>
                         <p className="text-sm text-muted-foreground truncate">
                           {conv.last_message || 'No messages yet'}
@@ -597,6 +682,27 @@ export default function Messages() {
             </div>
           </div>
         </Card>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete this chat?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete all messages in this conversation. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteConversation}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </MainLayout>
   );
