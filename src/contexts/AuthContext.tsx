@@ -12,6 +12,13 @@ interface Profile {
   is_online: boolean;
   is_verified: boolean | null;
   mobile_number: string | null;
+  email: string | null;
+  email_verified: boolean | null;
+  email_verification_token: string | null;
+  email_verification_sent_at: string | null;
+  show_email?: boolean;
+  show_mobile?: boolean;
+  show_location?: boolean;
   created_at: string;
 }
 

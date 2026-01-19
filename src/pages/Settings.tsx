@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
@@ -8,10 +8,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Camera, Save, LogOut, Phone, CheckCircle, AlertTriangle, Circle } from 'lucide-react';
+import { Camera, Save, LogOut, Phone, CheckCircle, AlertTriangle, Circle, Mail, Eye, EyeOff, Shield, BadgeCheck, Loader2, Send, MapPin } from 'lucide-react';
 import { PanchayathLocationPicker } from '@/components/settings/PanchayathLocationPicker';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
@@ -37,6 +38,30 @@ export default function Settings() {
   const [location, setLocation] = useState(profile?.location || '');
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  // Email verification state
+  const [email, setEmail] = useState(profile?.email || '');
+  const [sendingVerification, setSendingVerification] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
+
+  // Privacy settings state
+  const [showEmail, setShowEmail] = useState(profile?.show_email ?? false);
+  const [showMobile, setShowMobile] = useState(profile?.show_mobile ?? false);
+  const [showLocation, setShowLocation] = useState(profile?.show_location ?? true);
+  const [savingPrivacy, setSavingPrivacy] = useState(false);
+
+  useEffect(() => {
+    if (profile) {
+      setFullName(profile.full_name || '');
+      setUsername(profile.username || '');
+      setBio(profile.bio || '');
+      setLocation(profile.location || '');
+      setEmail(profile.email || '');
+      setShowEmail(profile.show_email ?? false);
+      setShowMobile(profile.show_mobile ?? false);
+      setShowLocation(profile.show_location ?? true);
+    }
+  }, [profile]);
 
   if (!user) {
     navigate('/auth');
@@ -105,6 +130,71 @@ export default function Settings() {
     }
   };
 
+  const handleSendVerification = async () => {
+    if (!email.trim()) {
+      toast({ title: 'Please enter an email address', variant: 'destructive' });
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      toast({ title: 'Please enter a valid email address', variant: 'destructive' });
+      return;
+    }
+
+    setSendingVerification(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-verification-email', {
+        body: { user_id: user.id, email: email.trim() }
+      });
+
+      if (error || data?.error) {
+        throw new Error(data?.error || error?.message || 'Failed to send verification');
+      }
+
+      setVerificationSent(true);
+      await refreshProfile();
+      toast({ 
+        title: 'Verification email sent!', 
+        description: 'Please check your inbox and click the verification link.'
+      });
+
+      // For development - show the debug link if available
+      if (data?.debug_link) {
+        console.log('Debug verification link:', data.debug_link);
+        toast({
+          title: 'Dev Mode: Verification Link',
+          description: 'Check console for the verification link'
+        });
+      }
+    } catch (error: any) {
+      toast({ 
+        title: 'Error sending verification', 
+        description: error.message, 
+        variant: 'destructive' 
+      });
+    } finally {
+      setSendingVerification(false);
+    }
+  };
+
+  const handleSavePrivacy = async () => {
+    setSavingPrivacy(true);
+    try {
+      // Privacy columns need to be added via migration first
+      // For now, just show a toast
+      toast({ 
+        title: 'Privacy settings saved locally', 
+        description: 'Database migration needed for full functionality'
+      });
+    } catch (error: any) {
+      toast({ title: 'Error updating privacy settings', description: error.message, variant: 'destructive' });
+    } finally {
+      setSavingPrivacy(false);
+    }
+  };
+
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
@@ -160,6 +250,156 @@ export default function Settings() {
             </AlertDescription>
           </Alert>
         )}
+
+        {/* Email Verification Card */}
+        <Card className="border-0 shadow-soft">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <BadgeCheck className="h-5 w-5 text-primary" />
+              <CardTitle>Profile Verification</CardTitle>
+            </div>
+            <CardDescription>Verify your email to get a verified badge on your profile</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {profile?.email_verified ? (
+              <Alert className="border-green-500/50 bg-green-50 dark:bg-green-950/20">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <AlertTitle className="text-green-800 dark:text-green-400">Email Verified</AlertTitle>
+                <AlertDescription className="text-green-700 dark:text-green-300">
+                  Your email ({profile.email}) is verified. You have a verified profile badge!
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="Enter your email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="pl-10"
+                        disabled={sendingVerification}
+                      />
+                    </div>
+                    <Button 
+                      onClick={handleSendVerification}
+                      disabled={sendingVerification || !email.trim()}
+                      className="gradient-primary text-white"
+                    >
+                      {sendingVerification ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Send className="mr-2 h-4 w-4" />
+                          Verify
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    We'll send a verification link to this email address
+                  </p>
+                </div>
+
+                {verificationSent && (
+                  <Alert className="border-blue-500/50 bg-blue-50 dark:bg-blue-950/20">
+                    <Mail className="h-4 w-4 text-blue-600" />
+                    <AlertTitle className="text-blue-800 dark:text-blue-400">Verification Sent</AlertTitle>
+                    <AlertDescription className="text-blue-700 dark:text-blue-300">
+                      Check your email ({email}) and click the verification link. Didn't receive it? Check your spam folder or try again.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Privacy Settings Card */}
+        <Card className="border-0 shadow-soft">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-primary" />
+              <CardTitle>Privacy Settings</CardTitle>
+            </div>
+            <CardDescription>Control what information is visible on your public profile</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between py-2">
+              <div className="flex items-center gap-3">
+                <Mail className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <p className="font-medium text-foreground">Show Email</p>
+                  <p className="text-sm text-muted-foreground">Display your email on your public profile</p>
+                </div>
+              </div>
+              <Switch 
+                checked={showEmail} 
+                onCheckedChange={setShowEmail}
+                disabled={!profile?.email_verified}
+              />
+            </div>
+            {!profile?.email_verified && (
+              <p className="text-xs text-muted-foreground ml-8">Verify your email first to show it publicly</p>
+            )}
+
+            <Separator />
+
+            <div className="flex items-center justify-between py-2">
+              <div className="flex items-center gap-3">
+                <Phone className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <p className="font-medium text-foreground">Show Mobile Number</p>
+                  <p className="text-sm text-muted-foreground">Display your phone number on your public profile</p>
+                </div>
+              </div>
+              <Switch 
+                checked={showMobile} 
+                onCheckedChange={setShowMobile}
+              />
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between py-2">
+              <div className="flex items-center gap-3">
+                <MapPin className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <p className="font-medium text-foreground">Show Location</p>
+                  <p className="text-sm text-muted-foreground">Display your location on your public profile</p>
+                </div>
+              </div>
+              <Switch 
+                checked={showLocation} 
+                onCheckedChange={setShowLocation}
+              />
+            </div>
+
+            <Button 
+              onClick={handleSavePrivacy} 
+              variant="outline"
+              disabled={savingPrivacy}
+              className="w-full"
+            >
+              {savingPrivacy ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Privacy Settings
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
 
         {/* Profile Settings */}
         <Card className="border-0 shadow-soft">

@@ -17,6 +17,7 @@ import Settings from "./pages/Settings";
 import Create from "./pages/Create";
 import Notifications from "./pages/Notifications";
 import NotFound from "./pages/NotFound";
+import VerifyEmail from "./pages/VerifyEmail";
 
 // Admin pages
 import { AdminRoute } from "./components/admin/AdminRoute";
@@ -55,6 +56,7 @@ const App = () => (
             <Route path="/settings" element={<Settings />} />
             <Route path="/create" element={<Create />} />
             <Route path="/notifications" element={<Notifications />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
             
             {/* Admin Routes */}
             <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
