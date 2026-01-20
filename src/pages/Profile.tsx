@@ -287,11 +287,9 @@ export default function Profile() {
                         showNotVerified={false}
                       />
                     </h1>
-                    {/* Only show username if it's not the mobile number, or if show_mobile is true */}
-                    {profileData.username && (
-                      profileData.show_mobile || 
-                      profileData.username !== profileData.mobile_number
-                    ) && (
+                    {/* Only show username if it's different from mobile number */}
+                    {profileData.username && 
+                      profileData.username !== profileData.mobile_number && (
                       <p className="text-muted-foreground">
                         @{profileData.username}
                       </p>
@@ -465,11 +463,9 @@ function UserCard({ user }: { user: ProfileData }) {
               {user.full_name || 'Anonymous'}
               <VerificationBadge isVerified={!!user.is_verified} size="sm" />
             </p>
-            {/* Only show username if it's not the mobile number, or if show_mobile is true */}
-            {user.username && (
-              user.show_mobile || 
-              user.username !== user.mobile_number
-            ) && (
+            {/* Only show username if it's different from mobile number */}
+            {user.username && 
+              user.username !== user.mobile_number && (
               <p className="text-sm text-muted-foreground truncate">
                 @{user.username}
               </p>
