@@ -140,18 +140,10 @@ Deno.serve(async (req) => {
 
     } else if (action === 'get_all_pending') {
       // Admin action: Get all pending deletion requests
+      // First get deletion requests
       const { data: requests, error: fetchError } = await supabase
         .from('account_deletion_requests')
-        .select(`
-          *,
-          profiles:user_id (
-            id,
-            full_name,
-            username,
-            avatar_url,
-            email
-          )
-        `)
+        .select('*')
         .eq('status', 'pending')
         .order('scheduled_deletion_at', { ascending: true });
 
@@ -160,16 +152,43 @@ Deno.serve(async (req) => {
         throw fetchError;
       }
 
+      // Then fetch profiles separately (handles custom auth user IDs)
+      const enrichedRequests = [];
+      for (const request of requests || []) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id, full_name, username, avatar_url, email, mobile_number')
+          .eq('id', request.user_id)
+          .maybeSingle();
+        
+        enrichedRequests.push({
+          ...request,
+          profiles: profile || { 
+            id: request.user_id, 
+            full_name: null, 
+            username: null, 
+            avatar_url: null, 
+            email: null,
+            mobile_number: null
+          }
+        });
+      }
+
+      console.log(`Found ${enrichedRequests.length} pending deletion requests`);
+
       return new Response(
         JSON.stringify({ 
           success: true,
-          requests: requests || []
+          requests: enrichedRequests
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
 
-    } else if (action === 'admin_delete_now') {
+    } else if (action === 'admin_delete_now' || action === 'admin_delete_direct') {
       // Admin action: Immediately delete user account
+      // admin_delete_now: requires pending request
+      // admin_delete_direct: no pending request required (for immediate deletion)
+      
       if (!admin_id) {
         return new Response(
           JSON.stringify({ error: 'admin_id is required for admin actions' }),
@@ -177,7 +196,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Verify admin has proper role
+      // Verify admin has proper role (check by admin_id in user_roles)
       const { data: adminRole, error: roleError } = await supabase
         .from('user_roles')
         .select('role')
@@ -206,7 +225,8 @@ Deno.serve(async (req) => {
         throw pendingError;
       }
 
-      if (!pendingRequest) {
+      // For admin_delete_now, require pending request. For admin_delete_direct, skip this check.
+      if (action === 'admin_delete_now' && !pendingRequest) {
         return new Response(
           JSON.stringify({ error: 'No pending deletion request found for this user. Users must request deletion first.' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -255,14 +275,16 @@ Deno.serve(async (req) => {
       // 13. Delete user credentials
       await supabase.from('user_credentials').delete().eq('id', user_id);
 
-      // 14. Update deletion request status
-      await supabase
-        .from('account_deletion_requests')
-        .update({
-          status: 'completed',
-          deleted_at: new Date().toISOString()
-        })
-        .eq('id', pendingRequest.id);
+      // 14. Update deletion request status (if exists)
+      if (pendingRequest) {
+        await supabase
+          .from('account_deletion_requests')
+          .update({
+            status: 'completed',
+            deleted_at: new Date().toISOString()
+          })
+          .eq('id', pendingRequest.id);
+      }
 
       // 15. Delete profile (last, as other tables reference it)
       const { error: profileError } = await supabase
@@ -278,13 +300,13 @@ Deno.serve(async (req) => {
       // Log admin activity
       await supabase.from('admin_activity_logs').insert({
         admin_id: admin_id,
-        action: 'Immediately deleted user account',
+        action: action === 'admin_delete_direct' ? 'Directly deleted user account' : 'Immediately deleted user account',
         target_type: 'user',
         target_id: user_id,
-        details: { 
+        details: pendingRequest ? { 
           deletion_request_id: pendingRequest.id,
           originally_scheduled_for: pendingRequest.scheduled_deletion_at
-        }
+        } : { direct_deletion: true }
       });
 
       console.log(`User ${user_id} account deleted by admin ${admin_id}`);
@@ -299,7 +321,7 @@ Deno.serve(async (req) => {
 
     } else {
       return new Response(
-        JSON.stringify({ error: 'Invalid action. Use: request_deletion, cancel_deletion, get_status, get_all_pending, or admin_delete_now' }),
+        JSON.stringify({ error: 'Invalid action. Use: request_deletion, cancel_deletion, get_status, get_all_pending, admin_delete_now, or admin_delete_direct' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
