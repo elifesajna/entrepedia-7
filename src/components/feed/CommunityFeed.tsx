@@ -85,13 +85,20 @@ export function CommunityFeed() {
     }
 
     try {
-      await supabase
-        .from('community_members')
-        .insert({
+      const stored = localStorage.getItem('samrambhak_auth');
+      const sessionToken = stored ? JSON.parse(stored).session_token : null;
+      
+      const { data, error } = await supabase.functions.invoke('manage-community', {
+        body: {
+          action: 'join',
           community_id: communityId,
-          user_id: user.id,
-          role: 'member',
-        });
+        },
+        headers: sessionToken ? { 'x-session-token': sessionToken } : {},
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
       toast({ title: 'Joined community!' });
       fetchCommunities();
     } catch (error: any) {
@@ -103,11 +110,20 @@ export function CommunityFeed() {
     if (!user) return;
 
     try {
-      await supabase
-        .from('community_members')
-        .delete()
-        .eq('community_id', communityId)
-        .eq('user_id', user.id);
+      const stored = localStorage.getItem('samrambhak_auth');
+      const sessionToken = stored ? JSON.parse(stored).session_token : null;
+      
+      const { data, error } = await supabase.functions.invoke('manage-community', {
+        body: {
+          action: 'leave',
+          community_id: communityId,
+        },
+        headers: sessionToken ? { 'x-session-token': sessionToken } : {},
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
       toast({ title: 'Left community' });
       fetchCommunities();
     } catch (error: any) {

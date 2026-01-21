@@ -195,13 +195,19 @@ export default function CommunityDetail() {
     if (!user) return;
     
     try {
-      const { error } = await supabase
-        .from('community_discussions')
-        .delete()
-        .eq('id', discussionId)
-        .eq('user_id', user.id);
+      const stored = localStorage.getItem('samrambhak_auth');
+      const sessionToken = stored ? JSON.parse(stored).session_token : null;
+      
+      const { data, error } = await supabase.functions.invoke('manage-community', {
+        body: {
+          action: 'delete_discussion',
+          discussion_id: discussionId,
+        },
+        headers: sessionToken ? { 'x-session-token': sessionToken } : {},
+      });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       
       toast({ title: 'Message deleted' });
       fetchCommunityData();
@@ -218,13 +224,19 @@ export default function CommunityDetail() {
     }
 
     try {
-      await supabase
-        .from('community_members')
-        .insert({
+      const stored = localStorage.getItem('samrambhak_auth');
+      const sessionToken = stored ? JSON.parse(stored).session_token : null;
+      
+      const { data, error } = await supabase.functions.invoke('manage-community', {
+        body: {
+          action: 'join',
           community_id: id,
-          user_id: user.id,
-          role: 'member',
-        });
+        },
+        headers: sessionToken ? { 'x-session-token': sessionToken } : {},
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
       toast({ title: 'Joined community!' });
       setIsMember(true);
@@ -238,11 +250,19 @@ export default function CommunityDetail() {
     if (!user || !id) return;
 
     try {
-      await supabase
-        .from('community_members')
-        .delete()
-        .eq('community_id', id)
-        .eq('user_id', user.id);
+      const stored = localStorage.getItem('samrambhak_auth');
+      const sessionToken = stored ? JSON.parse(stored).session_token : null;
+      
+      const { data, error } = await supabase.functions.invoke('manage-community', {
+        body: {
+          action: 'leave',
+          community_id: id,
+        },
+        headers: sessionToken ? { 'x-session-token': sessionToken } : {},
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
       toast({ title: 'Left community' });
       setIsMember(false);

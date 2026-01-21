@@ -98,19 +98,21 @@ export function BusinessFeed() {
     }
 
     try {
-      if (isFollowing) {
-        await supabase
-          .from('business_follows')
-          .delete()
-          .eq('business_id', businessId)
-          .eq('user_id', user.id);
-        toast({ title: 'Unfollowed business' });
-      } else {
-        await supabase
-          .from('business_follows')
-          .insert({ business_id: businessId, user_id: user.id });
-        toast({ title: 'Following business!' });
-      }
+      const stored = localStorage.getItem('samrambhak_auth');
+      const sessionToken = stored ? JSON.parse(stored).session_token : null;
+      
+      const { data, error } = await supabase.functions.invoke('manage-business-follow', {
+        body: {
+          action: isFollowing ? 'unfollow' : 'follow',
+          business_id: businessId,
+        },
+        headers: sessionToken ? { 'x-session-token': sessionToken } : {},
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast({ title: isFollowing ? 'Unfollowed business' : 'Following business!' });
       fetchBusinesses();
     } catch (error) {
       console.error('Error toggling follow:', error);

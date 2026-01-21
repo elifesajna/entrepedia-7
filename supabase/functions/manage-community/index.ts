@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { action, community_id, name, description, cover_image_url } = await req.json();
+    const { action, community_id, name, description, cover_image_url, discussion_id } = await req.json();
 
     // CREATE community
     if (action === "create") {
@@ -233,6 +233,36 @@ Deno.serve(async (req) => {
         console.error("Leave community error:", leaveError);
         return new Response(
           JSON.stringify({ error: leaveError.message }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ success: true }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // DELETE discussion
+    if (action === "delete_discussion") {
+      if (!discussion_id) {
+        return new Response(
+          JSON.stringify({ error: "Discussion ID is required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // User can only delete their own discussions
+      const { error: deleteDiscussionError } = await supabase
+        .from("community_discussions")
+        .delete()
+        .eq("id", discussion_id)
+        .eq("user_id", userId);
+
+      if (deleteDiscussionError) {
+        console.error("Delete discussion error:", deleteDiscussionError);
+        return new Response(
+          JSON.stringify({ error: deleteDiscussionError.message }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }

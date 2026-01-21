@@ -196,23 +196,30 @@ export default function BusinessProfile() {
 
     setFollowLoading(true);
     try {
+      const stored = localStorage.getItem('samrambhak_auth');
+      const sessionToken = stored ? JSON.parse(stored).session_token : null;
+      
+      const { data, error } = await supabase.functions.invoke('manage-business-follow', {
+        body: {
+          action: isFollowing ? 'unfollow' : 'follow',
+          business_id: id,
+        },
+        headers: sessionToken ? { 'x-session-token': sessionToken } : {},
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
       if (isFollowing) {
-        await supabase
-          .from('business_follows')
-          .delete()
-          .eq('business_id', id)
-          .eq('user_id', user.id);
         setIsFollowing(false);
         setFollowerCount(prev => prev - 1);
       } else {
-        await supabase
-          .from('business_follows')
-          .insert({ business_id: id, user_id: user.id });
         setIsFollowing(true);
         setFollowerCount(prev => prev + 1);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error toggling follow:', error);
+      toast({ title: 'Error updating follow status', description: error.message, variant: 'destructive' });
     } finally {
       setFollowLoading(false);
     }

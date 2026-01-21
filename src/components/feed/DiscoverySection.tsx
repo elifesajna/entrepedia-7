@@ -283,15 +283,21 @@ export function DiscoverySection() {
       return;
     }
     try {
-      if (isFollowing) {
-        await supabase.from('business_follows').delete()
-          .eq('business_id', businessId).eq('user_id', user.id);
-        toast({ title: 'Unfollowed' });
-      } else {
-        await supabase.from('business_follows')
-          .insert({ business_id: businessId, user_id: user.id });
-        toast({ title: 'Following!' });
-      }
+      const stored = localStorage.getItem('samrambhak_auth');
+      const sessionToken = stored ? JSON.parse(stored).session_token : null;
+      
+      const { data, error } = await supabase.functions.invoke('manage-business-follow', {
+        body: {
+          action: isFollowing ? 'unfollow' : 'follow',
+          business_id: businessId,
+        },
+        headers: sessionToken ? { 'x-session-token': sessionToken } : {},
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast({ title: isFollowing ? 'Unfollowed' : 'Following!' });
       fetchDiscoveryData();
     } catch (error) {
       console.error('Error:', error);
@@ -304,15 +310,21 @@ export function DiscoverySection() {
       return;
     }
     try {
-      if (isMember) {
-        await supabase.from('community_members').delete()
-          .eq('community_id', communityId).eq('user_id', user.id);
-        toast({ title: 'Left community' });
-      } else {
-        await supabase.from('community_members')
-          .insert({ community_id: communityId, user_id: user.id, role: 'member' });
-        toast({ title: 'Joined!' });
-      }
+      const stored = localStorage.getItem('samrambhak_auth');
+      const sessionToken = stored ? JSON.parse(stored).session_token : null;
+      
+      const { data, error } = await supabase.functions.invoke('manage-community', {
+        body: {
+          action: isMember ? 'leave' : 'join',
+          community_id: communityId,
+        },
+        headers: sessionToken ? { 'x-session-token': sessionToken } : {},
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast({ title: isMember ? 'Left community' : 'Joined!' });
       fetchDiscoveryData();
     } catch (error) {
       console.error('Error:', error);

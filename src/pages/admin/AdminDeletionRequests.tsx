@@ -19,7 +19,7 @@ import {
 import { toast } from 'sonner';
 import { Trash2, Clock, AlertTriangle, Loader2, UserX } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAdminAuthSupabase } from '@/hooks/useAdminAuthSupabase';
 
 interface DeletionRequest {
   id: string;
@@ -37,7 +37,7 @@ interface DeletionRequest {
 }
 
 export default function AdminDeletionRequests() {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser } = useAdminAuthSupabase();
   const queryClient = useQueryClient();
   const [selectedRequest, setSelectedRequest] = useState<DeletionRequest | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
