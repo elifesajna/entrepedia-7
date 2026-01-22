@@ -112,13 +112,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
       });
 
+      // Handle HTTP errors from edge function (4xx, 5xx responses)
       if (response.error) {
-        return { error: new Error(response.error.message || 'Sign in failed') };
+        // Try to extract error message from the error context
+        const errorMessage = response.error.message || 'Sign in failed';
+        // Check if context contains the actual error from JSON response
+        const contextError = (response.error as any)?.context?.body;
+        if (contextError) {
+          try {
+            const parsed = JSON.parse(contextError);
+            if (parsed.error) {
+              return { error: new Error(parsed.error) };
+            }
+          } catch {
+            // Ignore parse errors
+          }
+        }
+        return { error: new Error(errorMessage) };
       }
 
       const data = response.data;
       
-      if (data.error) {
+      if (data?.error) {
         return { error: new Error(data.error) };
       }
 
